@@ -66,6 +66,7 @@ public struct ImagePicker: View {
             } else {
                 image?
                     .resizable()
+                    .scaledToFit()
             }
 
             VStack {
