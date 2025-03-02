@@ -60,13 +60,13 @@ public struct ImagePicker: View {
             if image == nil {
                 Image(systemName: "person.fill")
                     .resizable()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .foregroundColor(.secondary.opacity(0.8))
+                    .foregroundColor(.secondary)
                     .accessibilityHidden(true)
             } else {
                 image?
                     .resizable()
                     .scaledToFit()
+                    .accessibilityHidden(true)
             }
 
             VStack {
@@ -118,7 +118,7 @@ struct ImagePicker_Previews: PreviewProvider {
     static var photo: Image?
 
     static var previews: some View {
-    VStack {
+        VStack {
             Button("Reset") {
                 photo = nil
             }
@@ -133,21 +133,35 @@ struct ImagePicker_Previews: PreviewProvider {
                     ImagePicker(photo: $photo)
                         .frame(width: 150, height: 150)
                 }
-                .background(.red)
+                .background(.red.opacity(0.5))
             }
 
             HStack {
                 VStack {
                     ImagePicker(photo: $photo)
-                        .frame(width: 150, height: 150)
+                        .frame(width: 150, height: 250)
                 }
-                .background(.blue)
+                .background(.blue.opacity(0.5))
 
                 VStack {
                     ImagePicker(photo: $photo)
-                        .frame(width: 150, height: 150)
+                        .frame(width: 150, height: 250)
                 }
-                .background(.green)
+                .background(.green.opacity(0.5))
+            }
+
+            HStack {
+                VStack {
+                    ImagePicker(photo: $photo)
+                        .frame(width: 175, height: 100)
+                }
+                .background(.orange.opacity(0.5))
+
+                VStack {
+                    ImagePicker(photo: $photo)
+                        .frame(width: 175, height: 100)
+                }
+                .background(.purple.opacity(0.5))
             }
         }
     }
