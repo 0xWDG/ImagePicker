@@ -7,7 +7,7 @@ let package = Package(
     name: "ImagePicker",
     platforms: [
         .iOS(.v16),
-        .macOS(.v14),
+        .macOS(.v13),
         .watchOS(.v9),
         .tvOS(.v16)
     ],

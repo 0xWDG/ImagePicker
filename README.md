@@ -10,9 +10,9 @@ ImagePicker is a Swift Package to make it easy to pick images from the photo lib
 ## Requirements
 
 - Swift 5.9+ (Xcode 15+)
-- iOS 13+, macOS 10.15+
+- iOS 16+, macOS 13+, tvOS 16+, watchOS 9+
 
-## Installation (Pakage.swift)
+## Installation (Package.swift)
 
 ```swift
 dependencies: [

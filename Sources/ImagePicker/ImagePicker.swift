@@ -14,105 +14,125 @@
 import SwiftUI
 import PhotosUI
 
-/// ImagePicker
-///
-/// A SwiftUI Image Picker
+/// A SwiftUI control that selects and displays an image from the photo library.
 ///
 /// Example:
 /// ```swift
-/// @State var photo: Image?
+/// @State private var image: Image?
 ///
 /// var body: some View {
-///     ImagePicker(photo: $photo)
+///     ImagePicker(image: $image)
 /// }
 /// ```
+@available(iOS 16, macOS 13, tvOS 16, watchOS 9, *)
 public struct ImagePicker: View {
     /// The selected image
     @Binding
-    var image: Image?
+    private var image: Image?
 
     /// Is the PhotosPicker presented?
     @State
     private var photosPickerIsPresented = false
 
-    /// The selected picker items
+    /// The selected picker item
     @State
-    private var selectedPickerItem: [PhotosPickerItem] = []
+    private var selectedPickerItem: PhotosPickerItem?
 
-    /// The decoded images
-    @State
-    private var images: [Image?] = []
-
-    /// The maximum selection count
-    var maxSelectionCount: Int = 1
+    /// The longest edge of the decoded image, in pixels
+    private let maximumPixelDimension: Int
 
     /// Initialize the ImagePicker
     ///
-    /// - Parameters:
-    ///   - photo: The selected image
-    public init(photo: Binding<Image?>) {
-        self._image = photo
+    /// - Parameter image: The selected image.
+    /// - Parameter maximumPixelDimension: The longest edge of the decoded image, in pixels.
+    public init(image: Binding<Image?>, maximumPixelDimension: Int = 2_048) {
+        self._image = image
+        self.maximumPixelDimension = max(1, maximumPixelDimension)
+    }
+
+    /// Initialize the ImagePicker.
+    ///
+    /// - Parameter photo: The selected image.
+    /// - Parameter maximumPixelDimension: The longest edge of the decoded image, in pixels.
+    @available(*, deprecated, renamed: "init(image:maximumPixelDimension:)")
+    public init(photo: Binding<Image?>, maximumPixelDimension: Int = 2_048) {
+        self.init(image: photo, maximumPixelDimension: maximumPixelDimension)
     }
 
     /// The body of the ImagePicker
     public var body: some View {
-        ZStack {
-            if image == nil {
-                Image(systemName: "person.fill")
-                    .resizable()
-                    .foregroundColor(.secondary)
-                    .accessibilityHidden(true)
-            } else {
-                image?
-                    .resizable()
-                    .scaledToFit()
-                    .accessibilityHidden(true)
-            }
-
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Image(systemName: "photo.badge.plus")
-                        .accessibilityHidden(true)
-                        .padding(7)
-                        .foregroundColor(.accentColor)
+        Button {
+            photosPickerIsPresented = true
+        } label: {
+            ZStack(alignment: .bottomTrailing) {
+                if let image {
+                    image
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    Image(systemName: "photo")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundStyle(.secondary)
+                        .padding()
                 }
+
+                Image(systemName: "photo.badge.plus")
+                    .padding(7)
+                    .foregroundStyle(.tint)
             }
+            .accessibilityHidden(true)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(.rect)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .border(.black, width: 1)
-        .onTapGesture {
-            photosPickerIsPresented.toggle()
+        .buttonStyle(.plain)
+        .overlay {
+            Rectangle()
+                .stroke(.secondary, lineWidth: 1)
+                .allowsHitTesting(false)
         }
         .photosPicker(
             isPresented: $photosPickerIsPresented,
             selection: $selectedPickerItem,
-            maxSelectionCount: maxSelectionCount
+            matching: .images
         )
-        .onChange(of: $selectedPickerItem.wrappedValue, perform: { _ in
-            Task {
-#if canImport(UIKit)
-                if let imageData = try? await selectedPickerItem.first?.loadTransferable(
-                    type: Data.self
-                ), let decodedImage = UIImage(data: imageData) {
-                    image = Image(uiImage: decodedImage)
-                }
-#elseif canImport(AppKit)
-                if let imageData = try? await selectedPickerItem.first?.loadTransferable(
-                    type: Data.self
-                ), let decodedImage = NSImage(data: imageData) {
-                    image = Image(nsImage: decodedImage)
-                }
-#endif
-            }
-        })
+        .task(id: selectedPickerItem) {
+            await loadSelectedImage()
+        }
         .accessibilityLabel("Image picker")
-        .accessibilityHint("Tap to select a image")
-        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Select an image from the photo library")
+    }
+
+    /// Loads the current selection and ignores stale work after cancellation.
+    @MainActor
+    private func loadSelectedImage() async {
+        guard let selectedPickerItem else {
+            return
+        }
+
+        defer {
+            if self.selectedPickerItem == selectedPickerItem {
+                self.selectedPickerItem = nil
+            }
+        }
+
+        guard
+            let imageData = try? await selectedPickerItem.loadTransferable(type: Data.self),
+            !Task.isCancelled,
+            let decodedImage = await ImageDownsampler.image(
+                from: imageData,
+                maximumPixelDimension: maximumPixelDimension
+            ),
+            !Task.isCancelled
+        else {
+            return
+        }
+
+        image = Image(decorative: decodedImage, scale: 1)
     }
 }
 
+@available(iOS 16, macOS 13, tvOS 16, watchOS 9, *)
 struct ImagePicker_Previews: PreviewProvider {
     @State
     static var photo: Image?
@@ -125,12 +145,12 @@ struct ImagePicker_Previews: PreviewProvider {
 
             HStack(alignment: .center) {
                 VStack {
-                    ImagePicker(photo: $photo)
+                    ImagePicker(image: $photo)
                         .frame(width: 150, height: 150)
                 }
 
                 VStack {
-                    ImagePicker(photo: $photo)
+                    ImagePicker(image: $photo)
                         .frame(width: 150, height: 150)
                 }
                 .background(.red.opacity(0.5))
@@ -138,13 +158,13 @@ struct ImagePicker_Previews: PreviewProvider {
 
             HStack {
                 VStack {
-                    ImagePicker(photo: $photo)
+                    ImagePicker(image: $photo)
                         .frame(width: 150, height: 250)
                 }
                 .background(.blue.opacity(0.5))
 
                 VStack {
-                    ImagePicker(photo: $photo)
+                    ImagePicker(image: $photo)
                         .frame(width: 150, height: 250)
                 }
                 .background(.green.opacity(0.5))
@@ -152,13 +172,13 @@ struct ImagePicker_Previews: PreviewProvider {
 
             HStack {
                 VStack {
-                    ImagePicker(photo: $photo)
+                    ImagePicker(image: $photo)
                         .frame(width: 175, height: 100)
                 }
                 .background(.orange.opacity(0.5))
 
                 VStack {
-                    ImagePicker(photo: $photo)
+                    ImagePicker(image: $photo)
                         .frame(width: 175, height: 100)
                 }
                 .background(.purple.opacity(0.5))
@@ -166,5 +186,4 @@ struct ImagePicker_Previews: PreviewProvider {
         }
     }
 }
-
 #endif
